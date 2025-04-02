@@ -27,6 +27,7 @@ class _TrackScreenState extends ConsumerState<TrackScreen> {
   Widget build(BuildContext context) {
     final selectedDate = ref.watch(selectedDateProvider);
 
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Track Workout'),

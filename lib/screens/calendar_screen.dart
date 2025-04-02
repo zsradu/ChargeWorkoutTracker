@@ -45,7 +45,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
       ),
       body: TableCalendar<Workout>(
         firstDay: DateTime.utc(2020, 1, 1),
-        lastDay: DateTime.utc(2025, 12, 31),
+        lastDay: DateTime.utc(2029, 12, 31),
         focusedDay: _focusedDay,
         selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
         calendarFormat: CalendarFormat.month,

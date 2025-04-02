@@ -52,7 +52,7 @@ class _ExerciseLoggingScreenState extends ConsumerState<ExerciseLoggingScreen> {
       await db.insertWorkout(workout);
     }
 
-    ref.refresh(workoutsByDateProvider(selectedDate));
+    ref.invalidate(workoutsByDateProvider(selectedDate));
     if (mounted) {
       Navigator.of(context).pop();
     }

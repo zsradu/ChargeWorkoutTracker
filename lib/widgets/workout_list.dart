@@ -15,6 +15,7 @@ class WorkoutList extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final selectedDate = ref.watch(selectedDateProvider);
     final workoutsAsync = ref.watch(workoutsByDateProvider(selectedDate));
+
     final exercisesAsync = ref.watch(exercisesProvider);
 
     return workoutsAsync.when(
@@ -159,12 +160,12 @@ class WorkoutCard extends ConsumerWidget {
                           await ref
                               .read(databaseProvider)
                               .deleteWorkout(workout.id!);
-                          ref.refresh(workoutsByDateProvider(workout.date));
+                          ref.invalidate(workoutsByDateProvider(workout.date));
                         }
                       },
                     ),
-                  ]
-                )
+                  ],
+                ),
               ],
             ),
             const SizedBox(height: AppSpacing.sm),
