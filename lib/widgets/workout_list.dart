@@ -6,6 +6,7 @@ import '../providers/database_provider.dart';
 import '../models/workout.dart';
 import '../models/exercise.dart';
 import '../constants/theme.dart';
+import '../screens/exercise_logging_screen.dart';
 
 class WorkoutList extends ConsumerWidget {
   const WorkoutList({super.key});
@@ -54,7 +55,23 @@ class WorkoutList extends ConsumerWidget {
                     muscleGroup: 'Unknown',
                   ),
                 );
-                return WorkoutCard(workout: workout, exercise: exercise);
+                return WorkoutCard(
+                  workout: workout,
+                  exercise: exercise,
+                  onEdit: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ExerciseLoggingScreen(
+                          exercise: exercise,
+                          workout: workout,
+                        ),
+                      ),
+                    );
+                    // Refresh data when returning from editing a workout
+                    ref.invalidate(workoutsByDateProvider(selectedDate));
+                  },
+                );
               },
               loading: () => const CircularProgressIndicator(),
               error: (_, __) => const Text('Error loading exercise'),
@@ -71,11 +88,13 @@ class WorkoutList extends ConsumerWidget {
 class WorkoutCard extends ConsumerWidget {
   final Workout workout;
   final Exercise exercise;
+  final VoidCallback onEdit;
 
   const WorkoutCard({
     super.key,
     required this.workout,
     required this.exercise,
+    required this.onEdit,
   });
 
   @override
@@ -109,9 +128,7 @@ class WorkoutCard extends ConsumerWidget {
                   children: [
                     IconButton(
                       icon: const Icon(Icons.edit),
-                      onPressed: () {
-                        // TODO: Implement edit functionality
-                      },
+                      onPressed: onEdit,
                     ),
                     IconButton(
                       icon: const Icon(Icons.delete),
@@ -146,8 +163,8 @@ class WorkoutCard extends ConsumerWidget {
                         }
                       },
                     ),
-                  ],
-                ),
+                  ]
+                )
               ],
             ),
             const SizedBox(height: AppSpacing.sm),

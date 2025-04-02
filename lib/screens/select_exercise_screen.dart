@@ -2,10 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/exercise_provider.dart';
 import '../constants/theme.dart';
+import '../models/exercise.dart';
 import 'exercise_logging_screen.dart';
+import '../providers/database_provider.dart';
 
 class SelectExerciseScreen extends ConsumerWidget {
-  const SelectExerciseScreen({super.key});
+  final bool isProgressScreen;
+
+  const SelectExerciseScreen({
+    super.key,
+    this.isProgressScreen = false,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -25,9 +32,73 @@ class SelectExerciseScreen extends ConsumerWidget {
         ),
         body: TabBarView(
           children: muscleGroups.map((group) {
-            return ExerciseList(muscleGroup: group);
+            return ExerciseList(
+              muscleGroup: group,
+              isProgressScreen: isProgressScreen,
+            );
           }).toList(),
         ),
+        floatingActionButton: FloatingActionButton(
+          onPressed: () {
+            _showAddExerciseDialog(context, ref);
+          },
+          child: const Icon(Icons.add),
+        ),
+      ),
+    );
+  }
+
+  void _showAddExerciseDialog(BuildContext context, WidgetRef ref) {
+    final nameController = TextEditingController();
+    final muscleGroupController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add New Exercise'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: 'Exercise Name',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            TextField(
+              controller: muscleGroupController,
+              decoration: const InputDecoration(
+                labelText: 'Muscle Group',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              if (nameController.text.isNotEmpty && muscleGroupController.text.isNotEmpty) {
+                final exercise = Exercise(
+                  name: nameController.text,
+                  muscleGroup: muscleGroupController.text,
+                  isCustom: true,
+                );
+                await ref.read(databaseProvider).insertExercise(exercise);
+                ref.invalidate(exercisesProvider);
+                if (context.mounted) {
+                  Navigator.pop(context);
+                }
+              }
+            },
+            child: const Text('Add'),
+          ),
+        ],
       ),
     );
   }
@@ -35,10 +106,12 @@ class SelectExerciseScreen extends ConsumerWidget {
 
 class ExerciseList extends ConsumerWidget {
   final String muscleGroup;
+  final bool isProgressScreen;
 
   const ExerciseList({
     super.key,
     required this.muscleGroup,
+    required this.isProgressScreen,
   });
 
   @override
@@ -58,14 +131,18 @@ class ExerciseList extends ConsumerWidget {
                 subtitle: Text(exercise.muscleGroup),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => ExerciseLoggingScreen(
-                        exercise: exercise,
+                  if (isProgressScreen) {
+                    Navigator.pop(context, exercise);
+                  } else {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ExerciseLoggingScreen(
+                          exercise: exercise,
+                        ),
                       ),
-                    ),
-                  );
+                    );
+                  }
                 },
               ),
             );

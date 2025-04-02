@@ -5,7 +5,7 @@ import '../providers/exercise_provider.dart';
 import '../providers/workout_provider.dart';
 import '../constants/theme.dart';
 import '../models/exercise.dart';
-import '../models/workout.dart';
+import 'select_exercise_screen.dart';
 
 class ProgressScreen extends ConsumerStatefulWidget {
   const ProgressScreen({super.key});
@@ -16,6 +16,15 @@ class ProgressScreen extends ConsumerStatefulWidget {
 
 class _ProgressScreenState extends ConsumerState<ProgressScreen> {
   Exercise? selectedExercise;
+
+  @override
+  void initState() {
+    super.initState();
+    // Refresh data when screen is opened
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.invalidate(exercisesProvider);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -30,29 +39,35 @@ class _ProgressScreenState extends ConsumerState<ProgressScreen> {
           Padding(
             padding: const EdgeInsets.all(AppSpacing.md),
             child: exercisesAsync.when(
-              data: (exercises) => DropdownButtonFormField<Exercise>(
-                decoration: const InputDecoration(
-                  labelText: 'Select Exercise',
-                  border: OutlineInputBorder(),
-                ),
-                value: selectedExercise,
-                items: [
-                  const DropdownMenuItem<Exercise>(
-                    value: null,
-                    child: Text('General Progress'),
-                  ),
-                  ...exercises.map(
-                    (exercise) => DropdownMenuItem<Exercise>(
-                      value: exercise,
-                      child: Text(exercise.name),
+              data: (exercises) => Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        final result = await Navigator.push<Exercise>(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const SelectExerciseScreen(
+                              isProgressScreen: true,
+                            ),
+                          ),
+                        );
+                        if (result != null) {
+                          setState(() {
+                            selectedExercise = result;
+                          });
+                          // Refresh workout data for the selected exercise
+                          ref.invalidate(workoutsByExerciseProvider(result.id!));
+                        }
+                      },
+                      icon: const Icon(Icons.fitness_center),
+                      label: Text(
+                        selectedExercise?.name ?? 'Select Exercise',
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ),
                 ],
-                onChanged: (value) {
-                  setState(() {
-                    selectedExercise = value;
-                  });
-                },
               ),
               loading: () => const CircularProgressIndicator(),
               error: (_, __) => const Text('Error loading exercises'),
@@ -74,25 +89,59 @@ class GeneralProgress extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // For now, just show a placeholder
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.show_chart,
-            size: 64,
-            color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Text(
-            'General progress metrics coming soon',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: Theme.of(context).textTheme.bodySmall?.color,
+    final exercisesAsync = ref.watch(exercisesProvider);
+
+    return exercisesAsync.when(
+      data: (exercises) {
+        // if (exercises.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.show_chart,
+                  size: 64,
+                  color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
                 ),
-          ),
-        ],
-      ),
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  'No exercises logged yet',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: Theme.of(context).textTheme.bodySmall?.color,
+                      ),
+                ),
+              ],
+            ),
+          );
+        // }
+
+          /*
+        return ListView.builder(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          itemCount: exercises.length,
+          itemBuilder: (context, index) {
+            final exercise = exercises[index];
+            return Card(
+              child: ListTile(
+                title: Text(exercise.name),
+                subtitle: Text(exercise.muscleGroup),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ExerciseProgressScreen(exercise: exercise),
+                    ),
+                  );
+                },
+              ),
+            );
+          },
+        );
+        */
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (_, __) => const Center(child: Text('Error loading exercises')),
     );
   }
 }
@@ -122,6 +171,11 @@ class ExerciseProgress extends ConsumerWidget {
           );
         }
 
+        // Calculate min and max values for the graph
+        final minWeight = 0.0;
+        final maxWeight = workouts.map((w) => w.weight).reduce((a, b) => a > b ? a : b);
+        final maxReps = workouts.map((w) => w.reps).reduce((a, b) => a > b ? a : b);
+
         return Padding(
           padding: const EdgeInsets.all(AppSpacing.md),
           child: Card(
@@ -131,7 +185,7 @@ class ExerciseProgress extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Weight Progress',
+                    'Progress',
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: AppSpacing.md),
@@ -139,27 +193,39 @@ class ExerciseProgress extends ConsumerWidget {
                     child: LineChart(
                       LineChartData(
                         gridData: const FlGridData(show: true),
-                        titlesData: const FlTitlesData(
+                        titlesData: FlTitlesData(
                           leftTitles: AxisTitles(
                             sideTitles: SideTitles(
                               showTitles: true,
                               reservedSize: 40,
+                              getTitlesWidget: (value, meta) {
+                                return Text(value.toStringAsFixed(0));
+                              },
                             ),
                           ),
                           bottomTitles: AxisTitles(
                             sideTitles: SideTitles(
                               showTitles: true,
                               reservedSize: 30,
+                              getTitlesWidget: (value, meta) {
+                                if (value.toInt() >= workouts.length) return const Text('');
+                                final date = workouts[value.toInt()].date;
+                                return Text('${date.day}/${date.month}');
+                              },
                             ),
                           ),
-                          rightTitles: AxisTitles(
+                          rightTitles: const AxisTitles(
                             sideTitles: SideTitles(showTitles: false),
                           ),
-                          topTitles: AxisTitles(
+                          topTitles: const AxisTitles(
                             sideTitles: SideTitles(showTitles: false),
                           ),
                         ),
                         borderData: FlBorderData(show: true),
+                        minX: 0,
+                        maxX: (workouts.length - 1).toDouble(),
+                        minY: minWeight,
+                        maxY: maxWeight > maxReps ? maxWeight : maxReps.toDouble(),
                         lineBarsData: [
                           LineChartBarData(
                             spots: List.generate(
@@ -171,6 +237,19 @@ class ExerciseProgress extends ConsumerWidget {
                             ),
                             isCurved: true,
                             color: Theme.of(context).colorScheme.primary,
+                            barWidth: 3,
+                            dotData: const FlDotData(show: true),
+                          ),
+                          LineChartBarData(
+                            spots: List.generate(
+                              workouts.length,
+                              (index) => FlSpot(
+                                index.toDouble(),
+                                workouts[index].reps.toDouble(),
+                              ),
+                            ),
+                            isCurved: true,
+                            color: Theme.of(context).colorScheme.secondary,
                             barWidth: 3,
                             dotData: const FlDotData(show: true),
                           ),
